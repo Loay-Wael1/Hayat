@@ -1,4 +1,5 @@
 using Hayat.API.Helper;
+using Hayat.API.Infrastructure;
 using Hayat.BLL.Helper;
 using Hayat.DAL.Helper;
 
@@ -6,7 +7,7 @@ namespace Hayat.API
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
@@ -16,27 +17,28 @@ namespace Hayat.API
             builder.Services.AddDalDependencies(builder.Configuration);
 
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-            builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
+            app.UseExceptionHandler();
+
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
+                await app.ApplyDevelopmentDatabaseSetupAsync();
             }
 
             app.UseHttpsRedirection();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
 
             app.MapControllers();
 
-            app.Run();
+            await app.RunAsync();
         }
     }
 }

@@ -12,10 +12,10 @@ namespace Hayat.DAL.Entities
         public AppointmentStatus Status { get; set; }
 
         public int ClinicId { get; set; }
-        public virtual Clinic Clinic { get; set; }
+        public virtual Clinic Clinic { get; set; } = null!;
 
         public Guid PatientId { get; set; }
-        public virtual Patient Patient { get; set; }
+        public virtual Patient Patient { get; set; } = null!;
 
     }
 }

@@ -11,9 +11,9 @@ namespace Hayat.DAL.Entities
         public TimeSpan EndTime { get; set; }
 
         public int ClinicId { get; set; }
-        public virtual Clinic Clinic { get; set; }
+        public virtual Clinic Clinic { get; set; } = null!;
 
         public Guid DoctorId { get; set; }
-        public virtual Doctor Doctor { get; set; }
+        public virtual Doctor Doctor { get; set; } = null!;
     }
 }
