@@ -1,12 +1,15 @@
+using Hayat.DAL.Data.Configurations;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 using Hayat.DAL.Entities;
 
 namespace Hayat.DAL.Data
 {
-    public class HayatDbContext: DbContext
+    public class HayatDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
     {
-        public HayatDbContext(DbContextOptions<HayatDbContext> options): base(options) { }
+        public HayatDbContext(DbContextOptions<HayatDbContext> options) : base(options) { }
 
         public DbSet<Branch> Branches { get; set; }
         public DbSet<Clinic> Clinics { get; set; }
@@ -22,8 +25,11 @@ namespace Hayat.DAL.Data
 
             // Apply all IEntityTypeConfiguration<T> classes from this assembly
             modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
+
+            modelBuilder.Entity<IdentityRole<Guid>>(builder =>
+            {
+                builder.Property(role => role.Id).HasValueGenerator<UuidV7Generator>();
+            });
         }
     }
-
-
-    }
+}

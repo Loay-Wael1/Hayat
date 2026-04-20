@@ -1,0 +1,10 @@
+using Hayat.BLL.DTOs.Doctor;
+
+namespace Hayat.BLL.Interfaces
+{
+    public interface IDoctorPortalService
+    {
+        Task<IReadOnlyList<DoctorQueueItemDto>> GetQueueAsync(Guid doctorId, DateOnly date, CancellationToken cancellationToken = default);
+        Task<IReadOnlyList<MedicalHistoryTimelineItemDto>> GetMedicalHistoryTimelineAsync(Guid patientId, CancellationToken cancellationToken = default);
+    }
+}
