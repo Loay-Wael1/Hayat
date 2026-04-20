@@ -1,3 +1,6 @@
+using Hayat.API.Helper;
+using Hayat.BLL.Helper;
+using Hayat.DAL.Helper;
 
 namespace Hayat.API
 {
@@ -8,6 +11,9 @@ namespace Hayat.API
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+            builder.Services.AddApiDependencies(builder.Configuration);
+            builder.Services.AddBllDependencies(builder.Configuration);
+            builder.Services.AddDalDependencies(builder.Configuration);
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
