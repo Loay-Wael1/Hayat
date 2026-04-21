@@ -7,7 +7,8 @@ namespace Hayat.BLL.Interfaces
     {
         Task<IReadOnlyList<PatientSearchResultDto>> SearchPatientsAsync(string searchTerm, CancellationToken cancellationToken = default);
         Task<AppointmentSummaryDto> BookAppointmentAsync(Guid branchId, BookAppointmentRequestDto request, CancellationToken cancellationToken = default);
-        Task<IReadOnlyList<AppointmentSummaryDto>> GetAppointmentsForDateAsync(Guid branchId, DateOnly date, CancellationToken cancellationToken = default);
+        Task<TodayAppointmentsResponseDto> GetTodayAppointmentsAsync(Guid branchId, TodayAppointmentsQueryDto request, CancellationToken cancellationToken = default);
+        Task<AppointmentSummaryDto> UpdateAppointmentStatusAsync(Guid branchId, int appointmentId, UpdateReceptionAppointmentStatusRequestDto request, CancellationToken cancellationToken = default);
         Task<RegisterPatientResponseDto> RegisterPatientAsync(RegisterPatientRequestDto request, CancellationToken cancellationToken = default);
     }
 }

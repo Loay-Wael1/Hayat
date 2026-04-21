@@ -47,16 +47,27 @@ namespace Hayat.API.Controllers
         }
 
         [HttpGet("appointments/today")]
-        public async Task<ActionResult<IReadOnlyList<AppointmentSummaryDto>>> GetTodayAppointments([FromQuery] DateOnly? date, CancellationToken cancellationToken)
+        public async Task<ActionResult<TodayAppointmentsResponseDto>> GetTodayAppointments([FromQuery] TodayAppointmentsQueryDto request, CancellationToken cancellationToken)
         {
             if (!User.TryGetBranchId(out var branchId))
             {
                 return Forbid();
             }
 
-            var targetDate = date ?? DateOnly.FromDateTime(DateTime.Today);
-            var appointments = await _receptionistPortalService.GetAppointmentsForDateAsync(branchId, targetDate, cancellationToken);
+            var appointments = await _receptionistPortalService.GetTodayAppointmentsAsync(branchId, request, cancellationToken);
             return Ok(appointments);
+        }
+
+        [HttpPatch("appointments/{appointmentId:int}/status")]
+        public async Task<ActionResult<AppointmentSummaryDto>> UpdateAppointmentStatus(int appointmentId, [FromBody] UpdateReceptionAppointmentStatusRequestDto request, CancellationToken cancellationToken)
+        {
+            if (!User.TryGetBranchId(out var branchId))
+            {
+                return Forbid();
+            }
+
+            var appointment = await _receptionistPortalService.UpdateAppointmentStatusAsync(branchId, appointmentId, request, cancellationToken);
+            return Ok(appointment);
         }
     }
 }
