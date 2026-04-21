@@ -5,6 +5,7 @@ using Hayat.BLL.Interfaces;
 using Hayat.DAL.Entities;
 using Hayat.DAL.Entities.Enums;
 using Hayat.DAL.Interfaces;
+using Hayat.DAL.Models.Appointments;
 
 namespace Hayat.BLL.Services
 {
@@ -155,26 +156,80 @@ namespace Hayat.BLL.Services
             return MapAppointment(appointment, clinic.ClinicName, patient.FullName, doctorId, doctorName);
         }
 
-        public async Task<IReadOnlyList<AppointmentSummaryDto>> GetAppointmentsForDateAsync(Guid branchId, DateOnly date, CancellationToken cancellationToken = default)
+        public async Task<TodayAppointmentsResponseDto> GetTodayAppointmentsAsync(Guid branchId, TodayAppointmentsQueryDto request, CancellationToken cancellationToken = default)
         {
-            var appointments = await _appointmentRepository.GetAppointmentsByBranchAndDateAsync(branchId, date, cancellationToken);
+            var effectiveStatus = ParseStatus(request.Status);
+            var effectiveCursor = ParseCursor(request.Cursor);
+            var effectiveSearch = request.AppointmentId.HasValue
+                ? null
+                : string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
 
-            return appointments
-                .Select(appointment => 
+            var query = new ReceptionTodayAppointmentsQuery
+            {
+                BranchId = branchId,
+                Date = DateOnly.FromDateTime(DateTime.Today),
+                Search = effectiveSearch,
+                AppointmentId = request.AppointmentId,
+                Status = effectiveStatus,
+                ClinicId = request.ClinicId,
+                Limit = request.Limit,
+                Cursor = request.AppointmentId.HasValue ? null : effectiveCursor
+            };
+
+            var result = await _appointmentRepository.GetReceptionTodayAppointmentsPageAsync(query, cancellationToken);
+            var items = result.Items.Select(MapAppointment).ToList();
+            var lastItem = items.LastOrDefault();
+
+            return new TodayAppointmentsResponseDto
+            {
+                Filters = new TodayAppointmentsFiltersDto
                 {
-                    var appDay = MapClinicDay(appointment.AppointmentDate.DayOfWeek);
-                    var appSchedule = appointment.Clinic?.ClinicSchedules?.FirstOrDefault(s => s.DayOfWeek == appDay);
-                    var appDoctorId = appSchedule?.DoctorId;
-                    var appDoctorName = appSchedule?.Doctor?.FullName ?? string.Empty;
+                    Search = effectiveSearch,
+                    AppointmentId = request.AppointmentId,
+                    Status = effectiveStatus?.ToString(),
+                    ClinicId = request.ClinicId
+                },
+                Items = items,
+                PageInfo = new CursorPageInfoDto
+                {
+                    Limit = request.Limit,
+                    HasMore = result.HasMore,
+                    NextCursor = result.HasMore && lastItem is not null
+                        ? CreateCursor(lastItem.AppointmentDate, lastItem.AppointmentId)
+                        : null
+                }
+            };
+        }
 
-                    return MapAppointment(
-                        appointment,
-                        appointment.Clinic?.ClinicName ?? string.Empty,
-                        appointment.Patient?.FullName ?? string.Empty,
-                        appDoctorId,
-                        appDoctorName);
-                })
-                .ToList();
+        public async Task<AppointmentSummaryDto> UpdateAppointmentStatusAsync(Guid branchId, int appointmentId, UpdateReceptionAppointmentStatusRequestDto request, CancellationToken cancellationToken = default)
+        {
+            var requestedStatus = ParseRequiredStatus(request.Status);
+            if (requestedStatus != AppointmentStatus.Waiting)
+            {
+                throw new BusinessRuleException("Receptionist can only set appointment status to Waiting.");
+            }
+
+            var appointment = await _appointmentRepository.GetBranchScopedAppointmentAsync(branchId, appointmentId, cancellationToken);
+            if (appointment is null)
+            {
+                throw new EntityNotFoundException("Appointment was not found for the current branch.");
+            }
+
+            if (appointment.Status == AppointmentStatus.Waiting)
+            {
+                return MapAppointment(appointment);
+            }
+
+            if (appointment.Status != AppointmentStatus.Scheduled)
+            {
+                throw new BusinessRuleException($"Receptionist cannot move appointment status from {appointment.Status} to Waiting.");
+            }
+
+            appointment.Status = AppointmentStatus.Waiting;
+            _appointmentRepository.Update(appointment);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            return MapAppointment(appointment);
         }
 
         private static AppointmentSummaryDto MapAppointment(Appointment appointment, string clinicName, string patientName, Guid? doctorId, string doctorName)
@@ -192,6 +247,72 @@ namespace Hayat.BLL.Services
                 DoctorId = doctorId,
                 DoctorName = doctorName
             };
+        }
+
+        private static AppointmentSummaryDto MapAppointment(Appointment appointment)
+        {
+            var appointmentDay = MapClinicDay(appointment.AppointmentDate.DayOfWeek);
+            var schedule = appointment.Clinic?.ClinicSchedules?.FirstOrDefault(existingSchedule => existingSchedule.DayOfWeek == appointmentDay);
+
+            return MapAppointment(
+                appointment,
+                appointment.Clinic?.ClinicName ?? string.Empty,
+                appointment.Patient?.FullName ?? string.Empty,
+                schedule?.DoctorId,
+                schedule?.Doctor?.FullName ?? string.Empty);
+        }
+
+        private static AppointmentStatus? ParseStatus(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return null;
+            }
+
+            if (!Enum.TryParse<AppointmentStatus>(status.Trim(), true, out var parsedStatus))
+            {
+                throw new BusinessRuleException("Invalid appointment status filter.");
+            }
+
+            return parsedStatus;
+        }
+
+        private static AppointmentStatus ParseRequiredStatus(string status)
+        {
+            if (!Enum.TryParse<AppointmentStatus>(status.Trim(), true, out var parsedStatus))
+            {
+                throw new BusinessRuleException("Invalid appointment status value.");
+            }
+
+            return parsedStatus;
+        }
+
+        private static AppointmentCursor? ParseCursor(string? cursor)
+        {
+            if (string.IsNullOrWhiteSpace(cursor))
+            {
+                return null;
+            }
+
+            var parts = cursor.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 ||
+                !long.TryParse(parts[0], out var ticks) ||
+                !int.TryParse(parts[1], out var appointmentId) ||
+                appointmentId <= 0)
+            {
+                throw new BusinessRuleException("Invalid cursor.");
+            }
+
+            return new AppointmentCursor
+            {
+                AppointmentDate = new DateTime(ticks),
+                AppointmentId = appointmentId
+            };
+        }
+
+        private static string CreateCursor(DateTime appointmentDate, int appointmentId)
+        {
+            return $"{appointmentDate.Ticks}_{appointmentId}";
         }
 
         private static ClinicDayOfWeek MapClinicDay(DayOfWeek dayOfWeek)
