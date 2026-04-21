@@ -27,15 +27,22 @@ namespace Hayat.API.Controllers
             return Ok(results);
         }
 
-        [HttpPost("appointments/quick-book")]
-        public async Task<ActionResult<AppointmentSummaryDto>> QuickBook([FromBody] QuickBookAppointmentRequestDto request, CancellationToken cancellationToken)
+        [HttpPost("patients")]
+        public async Task<ActionResult<RegisterPatientResponseDto>> RegisterPatient([FromBody] RegisterPatientRequestDto request, CancellationToken cancellationToken)
+        {
+            var patient = await _receptionistPortalService.RegisterPatientAsync(request, cancellationToken);
+            return Ok(patient);
+        }
+
+        [HttpPost("appointments/book")]
+        public async Task<ActionResult<AppointmentSummaryDto>> Book([FromBody] BookAppointmentRequestDto request, CancellationToken cancellationToken)
         {
             if (!User.TryGetBranchId(out var branchId))
             {
                 return Forbid();
             }
 
-            var appointment = await _receptionistPortalService.QuickBookAsync(branchId, request, cancellationToken);
+            var appointment = await _receptionistPortalService.BookAppointmentAsync(branchId, request, cancellationToken);
             return Ok(appointment);
         }
 

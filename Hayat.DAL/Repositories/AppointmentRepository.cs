@@ -20,6 +20,8 @@ namespace Hayat.DAL.Repositories
                 .AsNoTracking()
                 .Include(appointment => appointment.Patient)
                 .Include(appointment => appointment.Clinic)
+                    .ThenInclude(c => c.ClinicSchedules)
+                        .ThenInclude(cs => cs.Doctor)
                 .Where(appointment =>
                     appointment.AppointmentDate >= start &&
                     appointment.AppointmentDate < end &&
